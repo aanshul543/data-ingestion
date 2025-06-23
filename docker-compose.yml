@@ -1,0 +1,12 @@
+version: '3.8'
+
+services:
+  app:
+    build: .
+    container_name: ingestion-service
+    env_file:
+      - .env
+    networks:
+      - default
+    ports:
+      - "8080:8080"

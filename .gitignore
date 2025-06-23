@@ -1,0 +1,18 @@
+# Go build
+bin/
+*.exe
+*.out
+*.test
+*.log
+
+# IDEs
+.vscode/
+.idea/
+
+# Docker
+.env
+docker-compose.override.yml
+
+# Vendor & test output
+vendor/
+coverage.out
