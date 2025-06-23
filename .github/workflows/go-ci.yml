@@ -29,4 +29,3 @@ jobs:
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           AWS_REGION: ap-south-1
           AWS_BUCKET: cyderes-ingestion-bucket
-          CREATE_BUCKET: false
