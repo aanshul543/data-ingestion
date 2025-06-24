@@ -1,4 +1,4 @@
-package test
+package uploader
 
 import (
 	"errors"
@@ -7,7 +7,6 @@ import (
 	"github.com/anshul543/data-ingestion/internal/config"
 	"github.com/anshul543/data-ingestion/internal/fetcher"
 	"github.com/anshul543/data-ingestion/internal/transformer"
-	"github.com/anshul543/data-ingestion/internal/uploader"
 )
 
 func sampleData() []transformer.TransformedPost {
@@ -35,11 +34,17 @@ func TestUploader_InvalidAWSConfig_ShouldFail(t *testing.T) {
 		Bucket:    "fake-bucket",
 	}
 
-	u := uploader.NewUploader(cfg)
-	err := u.Upload(sampleData())
-
+	u, err := NewUploader(cfg)
 	if err == nil {
-		t.Error("Expected failure due to invalid AWS credentials, got nil")
+		t.Logf("Uploader init succeeded (unexpected), testing Upload error handling...")
+		err = u.Upload(sampleData())
+		if err == nil {
+			t.Error("Expected upload to fail due to invalid AWS credentials, got nil")
+		} else {
+			t.Logf("✅ Got expected upload error: %v", err)
+		}
+	} else {
+		t.Logf("✅ Got expected uploader init error: %v", err)
 	}
 }
 
@@ -85,5 +90,21 @@ func TestUploader_MockFailure(t *testing.T) {
 
 	if err == nil {
 		t.Error("Expected error from mock uploader, got nil")
+	}
+}
+
+// ----- Extra test: Nil client should fail -----
+
+func TestUploader_NilClient_ShouldFailUpload(t *testing.T) {
+	u := &uploader{
+		bucket: "any-bucket",
+		client: nil, // simulating broken init
+	}
+
+	err := u.Upload(sampleData())
+	if err == nil {
+		t.Error("Expected error due to nil client, got nil")
+	} else {
+		t.Logf("✅ Got expected error for nil client: %v", err)
 	}
 }

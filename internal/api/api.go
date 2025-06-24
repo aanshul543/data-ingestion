@@ -1,3 +1,4 @@
+// ✅ UPDATED: internal/api/api.go
 package api
 
 import (
@@ -11,6 +12,7 @@ import (
 	"github.com/anshul543/data-ingestion/internal/fetcher"
 	"github.com/anshul543/data-ingestion/internal/transformer"
 	"github.com/anshul543/data-ingestion/internal/uploader"
+
 	"github.com/aws/aws-sdk-go-v2/aws"
 	awsconfig "github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
@@ -23,7 +25,10 @@ type API struct {
 }
 
 func NewAPI(cfg config.AWSConfig) *API {
-	awsCfg, err := awsconfig.LoadDefaultConfig(context.TODO(), awsconfig.WithRegion(cfg.Region))
+	ctx := context.TODO()
+	awsCfg, err := awsconfig.LoadDefaultConfig(ctx,
+		awsconfig.WithRegion(cfg.Region),
+	)
 	if err != nil {
 		log.Fatalf("Failed to load AWS SDK config: %v", err)
 	}
@@ -31,28 +36,30 @@ func NewAPI(cfg config.AWSConfig) *API {
 	var s3Client *s3.Client
 	if cfg.Endpoint != "" {
 		log.Println("⚙️ Using custom S3 endpoint in API:", cfg.Endpoint)
-
 		s3Client = s3.New(s3.Options{
 			Credentials:      awsCfg.Credentials,
 			Region:           cfg.Region,
 			EndpointResolver: s3.EndpointResolverFromURL(cfg.Endpoint),
-			UsePathStyle:     true, // ✅ Required for MinIO
+			UsePathStyle:     true,
 		})
 	} else {
 		s3Client = s3.NewFromConfig(awsCfg)
 	}
 
+	u, err := uploader.NewUploader(cfg)
+	if err != nil {
+		log.Fatalf("Uploader initialization failed: %v", err)
+	}
+
 	return &API{
 		cfg:      cfg,
 		s3Client: s3Client,
-		uploader: uploader.NewUploader(cfg),
+		uploader: u,
 	}
 }
 
 func (a *API) GetIngestedPosts(w http.ResponseWriter, r *http.Request) {
 	ctx := context.TODO()
-
-	// List objects in the bucket under "ingested/"
 	resp, err := a.s3Client.ListObjectsV2(ctx, &s3.ListObjectsV2Input{
 		Bucket: aws.String(a.cfg.Bucket),
 		Prefix: aws.String("ingested/"),
@@ -61,19 +68,16 @@ func (a *API) GetIngestedPosts(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Failed to list S3 objects", http.StatusInternalServerError)
 		return
 	}
-
 	if len(resp.Contents) == 0 {
 		http.Error(w, "No ingested data found", http.StatusNotFound)
 		return
 	}
 
-	// Sort by LastModified to get the latest file
 	sort.Slice(resp.Contents, func(i, j int) bool {
 		return resp.Contents[i].LastModified.After(*resp.Contents[j].LastModified)
 	})
 	latest := resp.Contents[0].Key
 
-	// Get the latest object
 	obj, err := a.s3Client.GetObject(ctx, &s3.GetObjectInput{
 		Bucket: aws.String(a.cfg.Bucket),
 		Key:    latest,

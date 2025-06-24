@@ -1,11 +1,10 @@
-package test
+package transformer
 
 import (
 	"testing"
 	"time"
 
 	"github.com/anshul543/data-ingestion/internal/fetcher"
-	"github.com/anshul543/data-ingestion/internal/transformer"
 )
 
 func TestTransformPosts_Success(t *testing.T) {
@@ -13,7 +12,7 @@ func TestTransformPosts_Success(t *testing.T) {
 		{UserID: 1, ID: 1, Title: "Test", Body: "Hello"},
 	}
 
-	transformed := transformer.TransformPosts(sample)
+	transformed := TransformPosts(sample)
 	if len(transformed) != 1 {
 		t.Errorf("Expected 1 item, got %d", len(transformed))
 	}
@@ -30,7 +29,7 @@ func TestTransformPosts_Success(t *testing.T) {
 
 func TestTransformPosts_EmptyInput(t *testing.T) {
 	var sample []fetcher.Post
-	result := transformer.TransformPosts(sample)
+	result := TransformPosts(sample)
 
 	if len(result) != 0 {
 		t.Errorf("Expected 0 items for empty input, got %d", len(result))

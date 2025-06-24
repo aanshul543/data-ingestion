@@ -13,6 +13,7 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	awsConfig "github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	s3types "github.com/aws/aws-sdk-go-v2/service/s3/types"
 )
@@ -23,46 +24,47 @@ type uploader struct {
 	client *s3.Client
 }
 
-// NewUploader returns a real S3Uploader implementation
-func NewUploader(cfg config.AWSConfig) S3Uploader {
+// NewUploader returns a real S3Uploader implementation or error
+func NewUploader(cfg config.AWSConfig) (S3Uploader, error) {
 	ctx := context.TODO()
 
 	awsCfg, err := awsConfig.LoadDefaultConfig(ctx,
 		awsConfig.WithRegion(cfg.Region),
+		awsConfig.WithCredentialsProvider(
+			credentials.NewStaticCredentialsProvider(cfg.AccessKey, cfg.SecretKey, ""),
+		),
 	)
 	if err != nil {
-		log.Fatalf("Failed to load AWS SDK config: %v", err)
+		return nil, fmt.Errorf("failed to load AWS config: %w", err)
 	}
 
 	var s3Client *s3.Client
-
 	if cfg.Endpoint != "" {
 		log.Println("⚙️ Using custom S3 endpoint:", cfg.Endpoint)
 		s3Client = s3.New(s3.Options{
 			Credentials:      awsCfg.Credentials,
 			Region:           cfg.Region,
 			EndpointResolver: s3.EndpointResolverFromURL(cfg.Endpoint),
-			UsePathStyle:     true, // required for MinIO
+			UsePathStyle:     true,
 		})
 	} else {
 		s3Client = s3.NewFromConfig(awsCfg)
 	}
 
-	// ✅ Auto-create bucket if not found
+	// Attempt to create bucket if not exists
 	_, err = s3Client.HeadBucket(ctx, &s3.HeadBucketInput{
 		Bucket: &cfg.Bucket,
 	})
 	if err != nil {
 		log.Printf("📦 Bucket %s not found. Creating...", cfg.Bucket)
-
-		_, err := s3Client.CreateBucket(ctx, &s3.CreateBucketInput{
+		_, err = s3Client.CreateBucket(ctx, &s3.CreateBucketInput{
 			Bucket: &cfg.Bucket,
 			CreateBucketConfiguration: &s3types.CreateBucketConfiguration{
 				LocationConstraint: s3types.BucketLocationConstraint(cfg.Region),
 			},
 		})
 		if err != nil {
-			log.Fatalf("❌ Failed to create bucket: %v", err)
+			return nil, fmt.Errorf("failed to create bucket: %w", err)
 		}
 		log.Printf("✅ Bucket created: %s", cfg.Bucket)
 	} else {
@@ -72,12 +74,16 @@ func NewUploader(cfg config.AWSConfig) S3Uploader {
 	return &uploader{
 		bucket: cfg.Bucket,
 		client: s3Client,
-	}
+	}, nil
 }
 
 // Upload pushes transformed posts to S3 as a JSON file
 func (u *uploader) Upload(posts []transformer.TransformedPost) error {
 	ctx := context.TODO()
+
+	if u.client == nil {
+		return fmt.Errorf("uploader client is nil")
+	}
 
 	jsonData, err := json.MarshalIndent(posts, "", "  ")
 	if err != nil {
@@ -95,6 +101,6 @@ func (u *uploader) Upload(posts []transformer.TransformedPost) error {
 		return fmt.Errorf("failed to upload to S3: %w", err)
 	}
 
-	log.Printf("Uploaded file to S3: %s/%s", u.bucket, key)
+	log.Printf("✅ Uploaded file to S3: %s/%s", u.bucket, key)
 	return nil
 }

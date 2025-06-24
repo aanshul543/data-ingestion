@@ -31,7 +31,10 @@ func runIngestion(awsCfg config.AWSConfig) {
 		log.Fatalf("Failed to fetch posts: %v", err)
 	}
 	transformed := transformer.TransformPosts(posts)
-	s3Uploader := uploader.NewUploader(awsCfg)
+	s3Uploader, err := uploader.NewUploader(awsCfg)
+	if err != nil {
+		log.Fatalf("Uploader initialization failed: %v", err)
+	}
 	err = s3Uploader.Upload(transformed)
 	if err != nil {
 		log.Fatalf("Failed to upload to S3: %v", err)

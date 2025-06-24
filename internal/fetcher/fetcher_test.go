@@ -1,4 +1,4 @@
-package test
+package fetcher
 
 import (
 	"errors"
@@ -6,8 +6,6 @@ import (
 	"net/http"
 	"strings"
 	"testing"
-
-	"github.com/anshul543/data-ingestion/internal/fetcher"
 )
 
 // ----- Success Test (Mock HTTP Response) -----
@@ -25,7 +23,7 @@ func (m *mockSuccessTransport) RoundTrip(req *http.Request) (*http.Response, err
 
 func TestFetchPosts_Success(t *testing.T) {
 	client := &http.Client{Transport: &mockSuccessTransport{}}
-	posts, err := fetcher.FetchPostsWithClient(client)
+	posts, err := FetchPostsWithClient(client)
 
 	if err != nil {
 		t.Fatalf("Expected no error, got %v", err)
@@ -45,7 +43,7 @@ func (m *mockFailTransport) RoundTrip(req *http.Request) (*http.Response, error)
 
 func TestFetchPosts_Failure(t *testing.T) {
 	client := &http.Client{Transport: &mockFailTransport{}}
-	_, err := fetcher.FetchPostsWithClient(client)
+	_, err := FetchPostsWithClient(client)
 
 	if err == nil {
 		t.Error("Expected error from failing transport, got nil")
